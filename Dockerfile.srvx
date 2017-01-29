@@ -1,0 +1,15 @@
+FROM alpine:3.4
+LABEL Description="Runs a srvx 1.x daemon"
+
+COPY packages/ /tmp
+COPY srvx.conf/ /home/coder-com
+RUN cp /tmp/*.pub /etc/apk/keys \
+    && apk add --update -X /tmp/irc \
+       srvx \
+    && rm -rf /var/cache/apk/* /tmp/irc \
+    && chown -R coder-com /home/coder-com
+WORKDIR /home/coder-com
+USER coder-com
+STOPSIGNAL SIGQUIT
+ENTRYPOINT ["/home/coder-com/srvx"]
+CMD ["-f"]

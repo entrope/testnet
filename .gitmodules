@@ -1,0 +1,12 @@
+[submodule "ircu2"]
+	path = ircu2
+	url = https://github.com/UndernetIRC/ircu2.git
+	branch = u2_10_12_branch
+[submodule "iauthd-c"]
+	path = iauthd-c
+	url = https://github.com/UndernetIRC/iauthd-c.git
+	branch = master
+[submodule "srvx-1.x"]
+	path = srvx-1.x
+	url = https://github.com/GameSurge/srvx.git
+	branch = master

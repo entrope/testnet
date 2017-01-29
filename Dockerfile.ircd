@@ -1,0 +1,15 @@
+FROM alpine:3.4
+LABEL Description="Runs an Undernet IRC (ircu2) daemon"
+
+COPY packages/ /tmp
+COPY ircd.conf/ /home/coder-com/lib
+RUN cp /tmp/*.pub /etc/apk/keys \
+    && apk add --update -X /tmp/irc \
+       ircu2 \
+       iauthd-c \
+    && rm -rf /var/cache/apk/* /tmp/irc \
+    && chown -R coder-com /home/coder-com
+USER coder-com
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/home/coder-com/bin/ircd"]
+CMD ["-n"]

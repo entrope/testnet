@@ -1,0 +1,32 @@
+# Contributor: Entrope <entrope@sourceforge.net>
+# Maintainer: Entrope <entrope@sourceforge.net>
+pkgname=iauthd-c
+pkgver=0.1
+pkgrel=0
+pkgdesc="Undernet IAuth daemon"
+url="http://coder-com.undernet.org/"
+arch="all"
+license="MIT"
+makedepends="$depends_dev libevent-dev"
+options="!strip"
+source="
+	$pkgname-$pkgver.tar.gz
+	"
+
+_builddir="$srcdir"/+build
+
+build() {
+	rm -fr "$_builddir"
+	mkdir -p "$_builddir"
+	cd "$_builddir"
+	../$pkgname-$pkgver/configure --prefix=/home/coder-com
+	make
+}
+
+package() {
+	cd "$_builddir"
+	mkdir -p "$pkgdir"
+	make install DESTDIR="$pkgdir"
+	return 0
+}
+

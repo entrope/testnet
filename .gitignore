@@ -1,0 +1,5 @@
+*.tar.gz
+/abuild.conf
+/builder-id.txt
+/packages/
+/+*/

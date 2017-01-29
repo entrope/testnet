@@ -1,0 +1,37 @@
+# Contributor: Entrope <mdpoole@troilus.org>
+# Maintainer: Entrope <mdpoole@troilus.org>
+pkgname=ircu2
+pkgver=2.10.12.15
+pkgrel=0
+pkgdesc="Undernet IRC daemon"
+url="http://coder-com.undernet.org/"
+arch="all"
+license="GPL+"
+depends=""
+depends_dev=""
+makedepends="$depends_dev flex byacc"
+install="$pkgname.pre-install"
+options="!strip"
+pkggroups="coder-com"
+pkgusers="coder-com"
+source="
+	$pkgname.tar.gz
+	"
+
+_builddir="$srcdir"/+build
+
+build() {
+	rm -fr "$_builddir"
+	mkdir -p "$_builddir"
+	cd "$_builddir"
+	../$pkgname/configure --prefix=/home/coder-com --without-symlink --with-owner=coder-com --with-group=coder-com --enable-debug CFLAGS=-g LDFLAGS=-g
+	make
+}
+
+package() {
+	cd "$_builddir"
+	mkdir -p "$pkgdir"/home/coder-com
+	make install prefix="$pkgdir"/home/coder-com DPATH="$pkgdir"/home/coder-com/lib
+	return 0
+}
+

@@ -1,0 +1,38 @@
+# Contributor: Entrope <mdpoole@troilus.org>
+# Maintainer: Entrope <mdpoole@troilus.org>
+pkgname=srvx
+pkgver=1.4.0
+_pkgver=1.4.0-rc3
+pkgrel=0
+pkgdesc="srvx IRC services"
+url="http://srvx.org/"
+arch="all"
+license="GPL2+"
+depends=""
+depends_dev=""
+makedepends="$depends_dev"
+options="!strip"
+install="$pkgname.pre-install"
+pkggroups="coder-com"
+pkgusers="coder-com"
+source="
+	$pkgname-$_pkgver.tar.gz
+	"
+
+_builddir="$srcdir"/+build
+
+build() {
+	rm -fr "$_builddir"
+	mkdir -p "$_builddir"
+	cd "$_builddir"
+	../$pkgname-$_pkgver/configure --prefix=/home/coder-com
+	make
+}
+
+package() {
+	cd "$_builddir"
+	mkdir -p "$pkgdir"/home/coder-com
+	make install prefix="$pkgdir"/home/coder-com
+	return 0
+}
+

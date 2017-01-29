@@ -1,0 +1,4 @@
+#!/bin/sh
+
+addgroup -S coder-com 2>/dev/null
+adduser -S -D -s /bin/false -G coder-com -g coder-com coder-com 2>/dev/null

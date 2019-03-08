@@ -136,7 +136,7 @@ if ($#ARGV < 0) {
 		shift @r; # discard corrected filename
 		if (not @r) {
 			print "$path: $md5 not known\n";
-			continue;
+			next;
 		}
 
 		# Record ranges for this path and update @spans.

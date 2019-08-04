@@ -1,4 +1,4 @@
-FROM alpine:3.4
+FROM alpine:3.10.1
 LABEL Description="Alpine image for building coder-com packages"
 
 RUN apk add --update \

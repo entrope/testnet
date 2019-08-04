@@ -1,4 +1,4 @@
-IAUTH_VERSION = 0.1
+IAUTH_VERSION = 1.0.3
 SRVX_VERSION = 1.4.0-rc3
 
 packages: builder/Dockerfile \

@@ -1,4 +1,4 @@
-FROM alpine:3.4
+FROM alpine:3.10.1
 LABEL Description="Runs an Undernet IRC (ircu2) daemon"
 
 COPY packages/ /tmp

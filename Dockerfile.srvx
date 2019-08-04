@@ -1,4 +1,4 @@
-FROM alpine:3.4
+FROM alpine:3.10.1
 LABEL Description="Runs a srvx 1.x daemon"
 
 COPY packages/ /tmp

@@ -1,6 +1,8 @@
 IAUTH_VERSION = 1.0.3
 SRVX_VERSION = 1.4.0-rc3
 
+.PHONY: clean
+
 packages: builder/Dockerfile \
 	builder/iauth/iauthd-c-$(IAUTH_VERSION).tar.gz \
 	builder/ircu2/ircu2.tar.gz \
@@ -38,3 +40,9 @@ srvx-1.x/configure: srvx-1.x/configure.ac
 
 iauthd-c/configure.ac ircu2/configure srvx-1.x/configure.ac:
 	git submodule update --init
+
+clean:
+	rm -fr packages \
+	builder/iauth/iauthd-c-$(IAUTH_VERSION).tar.gz \
+	builder/ircu2/ircu2.tar.gz \
+	builder/srvx1/srvx-$(SRVX_VERSION).tar.gz

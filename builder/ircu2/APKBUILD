@@ -7,16 +7,14 @@ pkgdesc="Undernet IRC daemon"
 url="http://coder-com.undernet.org/"
 arch="all"
 license="GPL+"
-depends=""
+depends="openssl"
 depends_dev=""
-makedepends="$depends_dev flex byacc"
+makedepends="$depends_dev flex byacc clang17 compiler-rt openssl-dev"
 install="$pkgname.pre-install"
 options="!strip"
 pkggroups="coder-com"
 pkgusers="coder-com"
-source="
-	$pkgname.tar.gz
-	"
+source="$pkgname.tar.gz"
 
 _builddir="$srcdir"/+build
 
@@ -24,17 +22,23 @@ build() {
 	rm -fr "$_builddir"
 	mkdir -p "$_builddir"
 	cd "$_builddir"
-	../$pkgname/configure --prefix=/home/coder-com --without-symlink --with-owner=coder-com --with-group=coder-com --enable-debug CFLAGS=-g LDFLAGS=-g
+	INSTRUMENT="--coverage -fsanitize=address -fsanitize=undefined -fsanitize=cfi -flto -fvisibility=hidden"
+	../$pkgname/configure --prefix=/usr --without-symlink --with-owner=coder-com --with-group=coder-com --enable-debug CC="clang-17" CFLAGS="-g $INSTRUMENT" LDFLAGS="-g $INSTRUMENT"
 	make
 }
 
 check() {
-	make check
+	cd "$_builddir"
+	make -C ircd/test
+	./ircd/test/ircd_chattr_t
+	./ircd/test/ircd_in_addr_t
+	./ircd/test/ircd_match_t
+	./ircd/test/ircd_string_t
 }
 
 package() {
 	cd "$_builddir"
-	mkdir -p "$pkgdir"/home/coder-com
-	make install prefix="$pkgdir"/home/coder-com DPATH="$pkgdir"/home/coder-com/lib
+	mkdir -p "$pkgdir"/usr/lib
+	make install prefix="$pkgdir"/usr DPATH="$pkgdir"/usr/lib
 	return 0
 }

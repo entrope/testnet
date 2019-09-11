@@ -1,0 +1,11 @@
+FROM localhost/coder-com/builder:latest AS builder
+FROM scratch
+LABEL Description="Client-controlling entity for IRC test network"
+
+COPY passwd group /etc/
+COPY --from=builder /home/coder-com/go/bin/entity /bin/
+# Entity should run as root to bind to (privileged) ident port, 113.
+# USER coder-com
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/bin/entity"]
+CMD ["-port=5000", "-user=coder-com"]

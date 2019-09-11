@@ -1,4 +1,4 @@
-FROM alpine:3.11.2
+FROM alpine:3
 LABEL Description="Runs a srvx 1.x daemon"
 
 COPY . /tmp
@@ -10,5 +10,5 @@ RUN cp /tmp/*.pub /etc/apk/keys \
 WORKDIR /home/coder-com
 USER coder-com
 STOPSIGNAL SIGQUIT
-ENTRYPOINT ["/home/coder-com/srvx"]
+ENTRYPOINT ["/usr/srvx"]
 CMD ["-f"]

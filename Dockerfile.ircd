@@ -1,4 +1,4 @@
-FROM alpine:3.11.2
+FROM alpine:3
 LABEL Description="Runs an Undernet IRC (ircu2) daemon"
 
 COPY . /tmp
@@ -8,8 +8,8 @@ RUN cp /tmp/*.pub /etc/apk/keys \
        iauthd-c \
     && rm -rf /var/cache/apk/* /tmp/irc \
     && chown -R coder-com /home/coder-com
-WORKDIR /home/coder-com/etc
+WORKDIR /usr/lib
 USER coder-com
 STOPSIGNAL SIGTERM
-ENTRYPOINT ["/home/coder-com/bin/ircd"]
+ENTRYPOINT ["/usr/bin/ircd"]
 CMD ["-n"]

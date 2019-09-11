@@ -10,14 +10,12 @@ arch="all"
 license="GPL2+"
 depends=""
 depends_dev=""
-makedepends="$depends_dev"
+makedepends="$depends_dev clang17 compiler-rt"
 options="!strip"
 install="$pkgname.pre-install"
 pkggroups="coder-com"
 pkgusers="coder-com"
-source="
-	$pkgname-$_pkgver.tar.gz
-	"
+source="$pkgname-$_pkgver.tar.gz"
 
 _builddir="$srcdir"/+build
 
@@ -25,18 +23,19 @@ build() {
 	rm -fr "$_builddir"
 	mkdir -p "$_builddir"
 	cd "$_builddir"
-	../$pkgname-$_pkgver/configure --prefix=/home/coder-com
+	INSTRUMENT="--coverage -fsanitize=address -fsanitize=undefined -fsanitize=cfi -flto -fvisibility=hidden"
+	../$pkgname-$_pkgver/configure --prefix=/usr CC="clang-17" CFLAGS="$INSTRUMENT"
 	make
 }
 
 check() {
+	cd "$_builddir"
 	make check
 }
 
 package() {
 	cd "$_builddir"
-	mkdir -p "$pkgdir"/home/coder-com
-	make install prefix="$pkgdir"/home/coder-com
+	mkdir -p "$pkgdir"
+	make install DESTDIR="$pkgdir"
 	return 0
 }
-

@@ -1,17 +1,15 @@
 # Contributor: Entrope <entrope@undernet.org>
 # Maintainer: Entrope <entrope@undernet.org>
 pkgname=iauthd-c
-pkgver=1.0.4
+pkgver=1.0.5
 pkgrel=0
 pkgdesc="Undernet IAuth daemon"
 url="http://coder-com.undernet.org/"
 arch="all"
 license="MIT"
-makedepends="$depends_dev libevent-dev"
+makedepends="$depends_dev libevent-dev clang17 compiler-rt"
 options="!strip"
-source="
-	$pkgname-$pkgver.tar.gz
-	"
+source="$pkgname-$pkgver.tar.gz"
 
 _builddir="$srcdir"/+build
 
@@ -19,11 +17,14 @@ build() {
 	rm -fr "$_builddir"
 	mkdir -p "$_builddir"
 	cd "$_builddir"
-	../$pkgname-$pkgver/configure --prefix=/home/coder-com
+	# -fsanitize=cfi causes loading the runtime modules to fail
+	INSTRUMENT="--coverage -fsanitize=address -fsanitize=undefined"
+	../$pkgname-$pkgver/configure --prefix=/usr --localstatedir=/var CC="clang-17" CFLAGS="$INSTRUMENT"
 	make
 }
 
 check() {
+	cd "$_builddir"
 	make check
 }
 

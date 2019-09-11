@@ -1,17 +1,25 @@
+GIT = git
+GO = go
 DOCKER = podman
-IAUTH_VERSION = 1.0.4
+IAUTH_VERSION = 1.0.5
 SRVX_VERSION = 1.4.0-rc3
 
 .PHONY: clean
 
+all: images orchestrate/orchestrate
+
+orchestrate/orchestrate: orchestrate/main.go
+	cd orchestrate && $(GO) build
+
 images: packages
-	for pkg in entity ircd proxy srvx ; do \
+	for pkg in boss entity ircd srvx ; do \
 		if test -z `$(DOCKER) images -q testnet:$$pkg` ; then \
 			$(DOCKER) build packages -f Dockerfile.$$pkg -t testnet:$${pkg} ; \
 		fi; \
 	done
 
 packages: builder/Dockerfile \
+	builder/go-testnet/go.mod \
 	builder/iauth/iauthd-c-$(IAUTH_VERSION).tar.gz \
 	builder/ircu2/ircu2.tar.gz \
 	builder/srvx1/srvx-$(SRVX_VERSION).tar.gz
@@ -46,11 +54,13 @@ iauthd-c/configure: iauthd-c/configure.ac
 srvx-1.x/configure: srvx-1.x/configure.ac
 	autoreconf -Wall -i srvx-1.x
 
-iauthd-c/configure.ac ircu2/configure srvx-1.x/configure.ac:
-	git submodule update --init
+iauthd-c/configure.ac ircu2/configure srvx-1.x/configure.ac \
+	builder/go-testnet/go.mod:
+	$(GIT) submodule update --init
 
 clean:
 	rm -fr packages \
+	orchestrate/orchestrate \
 	builder/iauth/iauthd-c-$(IAUTH_VERSION).tar.gz \
 	builder/ircu2/ircu2.tar.gz \
 	builder/srvx1/srvx-$(SRVX_VERSION).tar.gz

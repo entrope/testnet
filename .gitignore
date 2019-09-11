@@ -2,4 +2,5 @@
 /abuild.conf
 /builder-id.txt
 /packages/
+/tests/*/compose.yaml
 /+*/

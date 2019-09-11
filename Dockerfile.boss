@@ -1,0 +1,10 @@
+FROM localhost/coder-com/builder:latest AS builder
+FROM scratch
+LABEL Description="Testnet-controlling image for IRC test network"
+
+COPY passwd group /etc/
+COPY --from=builder /home/coder-com/go/bin/boss /bin/
+USER coder-com
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/bin/boss"]
+CMD []

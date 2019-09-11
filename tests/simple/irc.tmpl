@@ -1,0 +1,119 @@
+{{- /*
+This file contains Go text/template content for an orchestrated test.
+
+The top-level template is a script for the testnet boss, as described
+at README.md from github.com/entrope/testnet.
+Other named templates are used to configure testnet entities.
+Any template named "foo:/bar" will be used to populate a file named
+"/bar" in the container for the entity named "foo".
+*/ -}}
+
+SUFFIX example.org
+IRCD irc-1...
+CLIENT user1 irc-1...
+:user1 USER user1 12 _ :Some scripted user
+:user1 NICK user1
+
+{{define "ircd.motd" -}}
+HELLO WORLD FROM ircd.motd !!!
+{{- end}}
+
+{{define "ircd-common-conf" -}}
+Admin {
+  Location = "An IRC Testnet";
+  Location = "Internetworken";
+  Contact = "IRC Admins <irc@example.org>";
+}
+
+Class {
+  name = "Server";
+  pingfreq = 90 seconds;
+  connectfreq = 300 seconds;
+  maxlinks = 1;
+  sendq = 12 megabytes;
+};
+
+Class {
+  name = "LeafServer";
+  pingfreq = 90 seconds;
+  connectfreq = 300 seconds;
+  maxlinks = 0;
+  sendq = 12 megabytes;
+};
+
+Class {
+  name = "Opers";
+  pingfreq = 90 seconds;
+  sendq = 160000;
+  maxlinks = 10;
+  usermode = "+iw";
+};
+
+Class {
+  name = "Other";
+  pingfreq = 90 seconds;
+  sendq = 160000;
+  maxlinks = 500;
+  usermode = "+iw";
+};
+
+Client {
+  class = "Other";
+  ip = "*@*";
+  maxlinks = 2;
+};
+
+Client {
+  class = "Other";
+  host = "*@*";
+  maxlinks = 2;
+};
+
+motd { host = "*"; file = "irc.motd"; };
+
+Uworld {
+  oper = "srvx.example.org";
+  oper = "uworld.example.org";
+  name = "channels.example.org";
+};
+
+Jupe {
+  nick = "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,{,|,},~,-,_,`";
+  nick = "EuWorld,UWorld,UWorld2";
+  nick = "login,undernet,protocol,pass,newpass,org";
+  nick = "StatServ,NoteServ";
+  nick = "ChanSvr,ChanSaver,ChanServ";
+  nick = "NickSvr,NickSaver,NickServ";
+  nick = "LPT1,LPT2,COM1,COM2,COM3,COM4,AUX";
+};
+
+Operator {
+  name = "Awper";
+  local = no;
+  password = "$PLAIN$4wp3r4t0r";
+  class = "Opers";
+  local = no;
+};
+
+Port { port = 4400; server = yes; };
+Port { port = 6667; server = no; };
+
+IPCheck { except "::1"; };
+
+Features {
+};
+{{- end}}
+
+{{define "irc-1...:/usr/lib/ircd.motd" -}}
+{{template "ircd.motd" .}}
+{{- end}}
+
+{{define "irc-1...:/usr/lib/ircd.conf" -}}
+General {
+  name = "{{ .Me }}";
+  description = "Testnet Server 1";
+  numeric = 1;
+}
+
+{{template "ircd-common-conf" .}}
+{{- end}}

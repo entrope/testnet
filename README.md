@@ -8,12 +8,14 @@ ircu2, iauthd-c, and srvx 1.x.
 
 Run `make`.
 This will generate lots of output, culminating in the creation of
-several Docker images.
+several container images.
+Then you can run `./orchestrate/orchestrate orchestrate/simple-irc.tmpl`
+to set up and run a simple test network.
 
 ## The Longer Story
 
-The `Makefile` in this directory will build a development Docker image
-and copy Alpine Linux packages out of the image.
+The `Makefile` in this directory will build a development container
+image and copy Alpine Linux packages out of the image.
 It uses git submodules to store copies of the source code to use;
 you can delete the tarballs in `builder/*/*.tar.gz` to generate new ones
 from the working trees.
@@ -21,7 +23,7 @@ The generated packages contain debug symbols for easier debugging, and
 have code coverage enabled.
 
 The default target for the Makefile (`images`) builds the `packages`
-directory and then runs `docker build -f Dockerfile.${image}` for any
+directory and then runs `podman build -f Dockerfile.${image}` for any
 testnet image that does not exist in the local repository.
 
 ## Debugging Crashes
@@ -42,3 +44,11 @@ virtualized as of Linux 4.7.)
 The `.gitignore` file ignores `/+*/` to support the creation of build
 directories on the host system -- for example, `+iauthd-c` for the
 iauthd-c submodule.
+
+## TODO
+
+- Finish writing the orchestrator.
+- Allow running the IRC software under valgrind or with sanitizer(s).
+  - Ideally allow selection of instrumentation: branch and coverage
+    profiling, sanitizers, GCC's -fanalyzer, clang's --analyze,
+    valgrind, maybe others.

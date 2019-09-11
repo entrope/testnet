@@ -28,10 +28,13 @@ build() {
 	make
 }
 
+check() {
+	make check
+}
+
 package() {
 	cd "$_builddir"
 	mkdir -p "$pkgdir"/home/coder-com
 	make install prefix="$pkgdir"/home/coder-com DPATH="$pkgdir"/home/coder-com/lib
 	return 0
 }
-

@@ -29,6 +29,10 @@ build() {
 	make
 }
 
+check() {
+	make check
+}
+
 package() {
 	cd "$_builddir"
 	mkdir -p "$pkgdir"/home/coder-com

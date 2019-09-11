@@ -1,27 +1,35 @@
+DOCKER = docker
 IAUTH_VERSION = 1.0.3
 SRVX_VERSION = 1.4.0-rc3
 
 .PHONY: clean
+
+images: packages
+	for pkg in entity ircd proxy srvx ; do \
+		if test -z `$(DOCKER) images -q testnet:$$pkg` ; then \
+			$(DOCKER) build packages -f Dockerfile.$$pkg -t testnet:$${pkg} ; \
+		fi; \
+	done
 
 packages: builder/Dockerfile \
 	builder/iauth/iauthd-c-$(IAUTH_VERSION).tar.gz \
 	builder/ircu2/ircu2.tar.gz \
 	builder/srvx1/srvx-$(SRVX_VERSION).tar.gz
 	rm -fr packages
-	docker build -t coder-com/builder builder
-	CID=`docker create coder-com/builder` && \
-	docker cp $$CID:/home/coder-com/packages . && \
-	docker rm $$CID > /dev/null
+	$(DOCKER) build -t coder-com/builder builder
+	CID=`$(DOCKER) create coder-com/builder` && \
+	$(DOCKER) cp $$CID:/home/coder-com/packages . && \
+	$(DOCKER) rm $$CID > /dev/null
 
 builder/iauth/iauthd-c-$(IAUTH_VERSION).tar.gz: +iauthd-c/Makefile
-	make -C +iauthd-c dist
+	$(MAKE) -C +iauthd-c dist
 	rm -f $@ && ln +iauthd-c/iauthd-c-$(IAUTH_VERSION).tar.gz $@
 
 builder/ircu2/ircu2.tar.gz: ircu2/configure
 	tar czf $@ ircu2
 
 builder/srvx1/srvx-$(SRVX_VERSION).tar.gz: +srvx-1.x/Makefile
-	make -C +srvx-1.x dist
+	$(MAKE) -C +srvx-1.x dist
 	rm -f $@ && ln +srvx-1.x/srvx-$(SRVX_VERSION).tar.gz $@
 
 +iauthd-c/Makefile: iauthd-c/configure

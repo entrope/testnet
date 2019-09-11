@@ -1,8 +1,7 @@
-FROM alpine:3.10.1
+FROM alpine:3.11.2
 LABEL Description="Runs a srvx 1.x daemon"
 
-COPY packages/ /tmp
-COPY srvx.conf/ /home/coder-com
+COPY . /tmp
 RUN cp /tmp/*.pub /etc/apk/keys \
     && apk add --update -X /tmp/irc \
        srvx \

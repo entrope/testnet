@@ -1,7 +1,7 @@
-FROM alpine:3.10.1
+FROM alpine:3.11.2
 LABEL Description="Alpine image for building coder-com packages"
 
-RUN apk add --update \
+RUN apk add --no-cache --update \
     alpine-sdk \
     autoconf \
     automake \
@@ -9,7 +9,6 @@ RUN apk add --update \
     flex \
     libevent-dev \
     libtool \
-    && rm -rf /var/cache/apk/* \
     && adduser -D coder-com \
     && addgroup coder-com abuild \
     && echo "coder-com ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/coder-com \
@@ -17,10 +16,12 @@ RUN apk add --update \
 
 USER coder-com
 ENV PACKAGER="coder-com <coder-com@undernet.org>"
+COPY --chown=coder-com:coder-com . /home/coder-com/irc
 WORKDIR /home/coder-com/irc
-COPY . ./
 RUN abuild-keygen -a -i \
-    && sudo chown -R coder-com:coder-com ${HOME} \
+    && mkdir ${HOME}/packages \
+    && grep coder-com /etc/group > ${HOME}/packages/group \
+    && grep coder-com /etc/passwd > ${HOME}/packages/passwd \
     && for subdir in `find * -maxdepth 0 -type d` ; do \
 	cd ${subdir} \
         && abuild checksum \

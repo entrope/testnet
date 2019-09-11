@@ -1,5 +1,5 @@
-# Contributor: Entrope <entrope@sourceforge.net>
-# Maintainer: Entrope <entrope@sourceforge.net>
+# Contributor: Entrope <entrope@undernet.org>
+# Maintainer: Entrope <entrope@undernet.org>
 pkgname=iauthd-c
 pkgver=1.0.3
 pkgrel=0
@@ -23,10 +23,13 @@ build() {
 	make
 }
 
+check() {
+	make check
+}
+
 package() {
 	cd "$_builddir"
 	mkdir -p "$pkgdir"
 	make install DESTDIR="$pkgdir"
 	return 0
 }
-

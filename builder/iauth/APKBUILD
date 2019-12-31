@@ -1,7 +1,7 @@
 # Contributor: Entrope <entrope@undernet.org>
 # Maintainer: Entrope <entrope@undernet.org>
 pkgname=iauthd-c
-pkgver=1.0.3
+pkgver=1.0.4
 pkgrel=0
 pkgdesc="Undernet IAuth daemon"
 url="http://coder-com.undernet.org/"

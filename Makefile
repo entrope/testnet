@@ -1,5 +1,5 @@
 DOCKER = podman
-IAUTH_VERSION = 1.0.3
+IAUTH_VERSION = 1.0.4
 SRVX_VERSION = 1.4.0-rc3
 
 .PHONY: clean

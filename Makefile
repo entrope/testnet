@@ -1,4 +1,4 @@
-DOCKER = docker
+DOCKER = podman
 IAUTH_VERSION = 1.0.3
 SRVX_VERSION = 1.4.0-rc3
 

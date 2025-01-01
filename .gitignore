@@ -1,6 +1,8 @@
-*.tar.gz
-/abuild.conf
-/builder-id.txt
-/packages/
 /tests/*/compose.yaml
+/coverage/*/gcno/
+/coverage/*/gcda/
+/coverage/*/html/
+/coverage/*/lcov.dat
+/images/boss/boss
+/images/**/*.tar.gz
 /+*/

@@ -6,25 +6,29 @@ ircu2, iauthd-c, and srvx 1.x.
 
 ## A Really Quick Start
 
-Run `make`.
-This will generate lots of output, culminating in the creation of
-several container images.
+Run `sh bootstrap.sh`.
 Then you can run `./orchestrate/orchestrate orchestrate/simple-irc.tmpl`
 to set up and run a simple test network.
 
 ## The Longer Story
 
-The `Makefile` in this directory will build a development container
-image and copy Alpine Linux packages out of the image.
-It uses git submodules to store copies of the source code to use;
-you can delete the tarballs in `builder/*/*.tar.gz` to generate new ones
-from the working trees.
-The generated packages contain debug symbols for easier debugging, and
-have code coverage enabled.
+`bootstrap.sh` does several things:
 
-The default target for the Makefile (`images`) builds the `packages`
-directory and then runs `podman build -f Dockerfile.${image}` for any
-testnet image that does not exist in the local repository.
+1. Use `tools/genninja.go` to create a `ninja.build` file.
+1. Runs `ninja` to make sure container build contexts are prepared.
+1. Makes sure the base container image exists for Compose applications.
+
+The build contexts for the containers should reflect any changes to
+source code files, which implies that the build script (`Makefile` or
+`ninja.build`) should be updated when the list of source files changes.
+This is much easier to manage with Ninja.
+
+The base container image is built by `images/builder` and providse the
+toolchain for the build stage of multi-stage images.
+The testnet will always have an image built by `images/boss` that
+interprets the test script and instantiates clients.
+Other IRC software is created by other subdirectories of `images`, using
+git submodules to pull in the respective software.
 
 ## Debugging Crashes
 
@@ -45,10 +49,17 @@ The `.gitignore` file ignores `/+*/` to support the creation of build
 directories on the host system -- for example, `+iauthd-c` for the
 iauthd-c submodule.
 
-## TODO
+## Code Coverage
 
-- Finish writing the orchestrator.
-- Allow running the IRC software under valgrind or with sanitizer(s).
-  - Ideally allow selection of instrumentation: branch and coverage
-    profiling, sanitizers, GCC's -fanalyzer, clang's --analyze,
-    valgrind, maybe others.
+Most IRC software images enable code coverage outputs for their
+binaries.
+The orchestrator in turn collects these after running test cases under
+`/tests/` directory.
+Simple execution of it is as `.../orchestrator .../tests/<name>`, which
+will populate `.../coverage/<image>` with these contents:
+
+- `gcno/` (as needed) with the *.gcno files and perhaps other compiler
+  output, from the `build` stage of the respective image.
+- `gcda/` (per test run) with the *.gcda files for a given profile run.
+- `html/` with the generated HTML reports.
+- `lcov.dat` contains lcov's internal representation of coverage data.

@@ -9,7 +9,7 @@ arch="all"
 license="GPL+"
 depends="openssl"
 depends_dev=""
-makedepends="$depends_dev flex byacc clang17 compiler-rt openssl-dev"
+makedepends="$depends_dev flex byacc clang19 compiler-rt openssl-dev"
 install="$pkgname.pre-install"
 options="!strip"
 pkggroups="coder-com"
@@ -23,7 +23,7 @@ build() {
 	mkdir -p "$_builddir"
 	cd "$_builddir"
 	INSTRUMENT="--coverage -fsanitize=address -fsanitize=undefined -fsanitize=cfi -flto -fvisibility=hidden"
-	../$pkgname/configure --prefix=/usr --without-symlink --with-owner=coder-com --with-group=coder-com --enable-debug CC="clang-17" CFLAGS="-g $INSTRUMENT" LDFLAGS="-g $INSTRUMENT"
+	../$pkgname/configure --prefix=/usr --without-symlink --with-owner=coder-com --with-group=coder-com --enable-debug CC="clang" CFLAGS="-g $INSTRUMENT" LDFLAGS="-g $INSTRUMENT"
 	make
 }
 

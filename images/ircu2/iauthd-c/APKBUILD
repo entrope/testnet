@@ -7,7 +7,7 @@ pkgdesc="Undernet IAuth daemon"
 url="http://coder-com.undernet.org/"
 arch="all"
 license="MIT"
-makedepends="$depends_dev libevent-dev clang17 compiler-rt"
+makedepends="$depends_dev libevent-dev clang19 compiler-rt"
 options="!strip"
 source="$pkgname-$pkgver.tar.gz"
 
@@ -19,7 +19,7 @@ build() {
 	cd "$_builddir"
 	# -fsanitize=cfi causes loading the runtime modules to fail
 	INSTRUMENT="--coverage -fsanitize=address -fsanitize=undefined"
-	../$pkgname-$pkgver/configure --prefix=/usr --localstatedir=/var CC="clang-17" CFLAGS="$INSTRUMENT"
+	../$pkgname-$pkgver/configure --prefix=/usr --localstatedir=/var --sysconfdir=/etc CC="clang" CFLAGS="$INSTRUMENT"
 	make
 }
 

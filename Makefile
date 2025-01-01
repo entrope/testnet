@@ -6,37 +6,40 @@ SRVX_VERSION = 1.4.0-rc3
 
 .PHONY: clean
 
-all: images orchestrate/orchestrate
+all: packages images orchestrate/orchestrate
 
 orchestrate/orchestrate: orchestrate/main.go
 	cd orchestrate && $(GO) build
 
 images: packages
-	for pkg in boss entity ircd srvx ; do \
-		if test -z `$(DOCKER) images -q testnet:$$pkg` ; then \
-			$(DOCKER) build packages -f Dockerfile.$$pkg -t testnet:$${pkg} ; \
+	for pkg in boss ircu2 srvx-1.x ; do \
+		if test -z `$(DOCKER) images -q localhost/testnet/$$pkg` ; then \
+			$(DOCKER) build packages -f Dockerfile.$$pkg -t localhost/testnet/$${pkg} ; \
 		fi; \
 	done
 
-packages: builder/Dockerfile \
+packages: Dockerfile.buildimg \
+	Dockerfile.builder \
 	builder/go-testnet/go.mod \
-	builder/iauth/iauthd-c-$(IAUTH_VERSION).tar.gz \
+	builder/iauthd-c/iauthd-c-$(IAUTH_VERSION).tar.gz \
 	builder/ircu2/ircu2.tar.gz \
-	builder/srvx1/srvx-$(SRVX_VERSION).tar.gz
+	builder/srvx-1.x/srvx-$(SRVX_VERSION).tar.gz
 	rm -fr packages
-	$(DOCKER) build -t coder-com/builder builder
-	CID=`$(DOCKER) create coder-com/builder` && \
+	if ! CID=`$(DOCKER) create localhost/coder-com/builder` ; then \
+		$(DOCKER) build builder -f Dockerfile.builder -t localhost/coder-com/builder && \
+		CID=`$(DOCKER) create localhost/coder-com/builder` ; \
+	fi && \
 	$(DOCKER) cp $$CID:/home/coder-com/packages . && \
 	$(DOCKER) rm $$CID > /dev/null
 
-builder/iauth/iauthd-c-$(IAUTH_VERSION).tar.gz: +iauthd-c/Makefile
+images/ircu2/iauthd-c/iauthd-c-$(IAUTH_VERSION).tar.gz: +iauthd-c/Makefile
 	$(MAKE) -C +iauthd-c dist
 	rm -f $@ && ln +iauthd-c/iauthd-c-$(IAUTH_VERSION).tar.gz $@
 
-builder/ircu2/ircu2.tar.gz: ircu2/configure
+images/ircu2/ircu2/ircu2.tar.gz: ircu2/configure
 	tar czf $@ ircu2
 
-builder/srvx1/srvx-$(SRVX_VERSION).tar.gz: +srvx-1.x/Makefile
+images/srvx-1.x/srvx-$(SRVX_VERSION).tar.gz: +srvx-1.x/Makefile
 	$(MAKE) -C +srvx-1.x dist
 	rm -f $@ && ln +srvx-1.x/srvx-$(SRVX_VERSION).tar.gz $@
 
@@ -58,9 +61,14 @@ iauthd-c/configure.ac ircu2/configure srvx-1.x/configure.ac \
 	builder/go-testnet/go.mod:
 	$(GIT) submodule update --init
 
-clean:
+clean-tests:
+	for dir in tests/*/* ; do if test -d $$dir ; then rm -r $$dir ; fi ; done
+	rm -fr coverage/*/gcda coverage/*/gcno coverage/*/lcov.dat \
+	tests/*/compose.yaml tests/*/irc.script
+
+clean: clean-tests
 	rm -fr packages \
 	orchestrate/orchestrate \
-	builder/iauth/iauthd-c-$(IAUTH_VERSION).tar.gz \
+	builder/iauthd-c/iauthd-c-$(IAUTH_VERSION).tar.gz \
 	builder/ircu2/ircu2.tar.gz \
-	builder/srvx1/srvx-$(SRVX_VERSION).tar.gz
+	builder/srvx-1.x/srvx-$(SRVX_VERSION).tar.gz

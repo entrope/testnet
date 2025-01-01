@@ -10,6 +10,3 @@
 	path = srvx-1.x
 	url = https://github.com/GameSurge/srvx.git
 	branch = master
-[submodule "go-testnet"]
-	path = builder/go-testnet
-	url = https://github.com/entrope/go-testnet.git

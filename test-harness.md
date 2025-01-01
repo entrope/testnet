@@ -44,8 +44,8 @@ template within the test script, identified by the server's name.
 
 ```text
 SUFFIX example.org
-IRCD irc-1...
-HUB svc-1...
+SERVER irc-1... ircu2
+SERVER svc-1... srvx-1.x
 CLIENT user1 irc-1
 :user1 USER user1 12 _ :Some scripted user
 :user1 NICK user1
@@ -82,7 +82,7 @@ Key | Content
 Each line is processed in order.
 First, leading whitespace is removed, and blank lines are skipped.
 Lines starting with `#` are skipped as comments.
-Lines starting with `:` are treated as if they instead start with `SEND `.
+Lines starting with `:` are treated as if they instead start with `SEND`.
 
 Each non-comment, non-blank line is parsed as a command name, optionally
 followed by whitespace and then optional arguments.
@@ -110,7 +110,6 @@ The following variables have pre-defined meanings:
 
 Variable  |  Meaning
 --------- | --------
-`_` | Empty string on read; immutable (see `EXPECT`)
 `me` | Client's current nickname
 `channel` | Last channel that client joined; initially the empty string
 
@@ -133,13 +132,12 @@ Using an undefined variable is fatal.
 
 An unmet expectation where the client specifier included `!` is fatal.
 
-### IRCD and HUB Command Syntax
+### SERVER Command Syntax
 
-The syntax for the IRCD or HUB command is:
+The syntax for the SERVER command is:
 
 ```text
-IRCD <name>
-HUB <name>
+SERVER <name> <image>
 ```
 
 These commands look for a template within the script named
@@ -148,16 +146,16 @@ These commands look for a template within the script named
 with that name to pass to the corresponding container.
 Then the command launches the container.
 
-The only difference between `IRCD` and `HUB` is that an `IRCD` connects
-to both the client-side and server-only networks, whereas a `HUB` only
-connects to the server-only network (and is not reachable by clients).
+The container for this server uses the named `&lt;image>`, which must
+be built by a build context of the same name in this repository's
+`images` directory.
 
 ### CLIENT Command Syntax
 
 The syntax for the CLIENT command is:
 
 ```text
-CLIENT <name>[@<client>] <server> [<username>]
+CLIENT <name>[@<client>] <server>[/ssl] [<username>]
 ```
 
 The `name` of the new client is used for issuing later commands.
@@ -180,7 +178,7 @@ run on that container.
 The syntax for the EXPECT command is:
 
 ```text
-EXPECT <client>[@<timeout>][!] [<var1>,<var2>,...] :<regexp>
+EXPECT <client>[@<timeout>][!] :<regexp>
 ```
 
 This command looks for a line received by `client` that matches `text`.
@@ -190,17 +188,14 @@ The timeout may include a fractional part, as in 3.14159, although
 network traffic timing is somewhat noisy, so fine-grained timeouts are
 seldom useful.
 If `!` is present, a timeout is fatal.
-If a list of variable names is given, they must correspond to capturing
-groups in the regular expression, and they are assigned when a line
-matches that regexp.  The `_` variable name discards the corresponding
-captured text.
+Named subexpressions in `<regexp>` are saved for future transmitted lines.
 The `regexp` may contain one or more variable names; these are expanded
 before the regular expression is parsed.
 
-For example, `EXPECT user1 _,token :(.+ )?PING (.*)` will match both
+For example, `EXPECT user1 :(.+ )?PING (?<token>.*)` will match both
 `:server PING 12345` and `PING 12345`, discarding the `:server` in the
-first case (the `_` variable is read-only), and saving the text `12345`
-into the variable `${token}` in both cases.
+first case, and saving the text `12345` into the variable `${token}` in
+both cases.
 
 ### SEND Command Syntax
 
@@ -219,6 +214,16 @@ to five lines of burst allowed, matching IRC's historic rate limit).
 If the client's nickname is preceded by `!`, then this `SEND` command
 will not apply that rate-limiting, and is a high-priority command (it
 will not trigger an automatic `PONG` for the client).
+
+### SUFFIX Command Syntax
+
+The syntax for the SUFFIX command is:
+
+```text
+SUFFIX <example.org>
+```
+
+This sets the hostname suffix that replaces ... later in the script.
 
 ### WAIT Command Syntax
 

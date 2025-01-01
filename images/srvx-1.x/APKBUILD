@@ -10,7 +10,7 @@ arch="all"
 license="GPL2+"
 depends=""
 depends_dev=""
-makedepends="$depends_dev clang17 compiler-rt"
+makedepends="$depends_dev clang19 compiler-rt"
 options="!strip"
 install="$pkgname.pre-install"
 pkggroups="coder-com"
@@ -24,7 +24,7 @@ build() {
 	mkdir -p "$_builddir"
 	cd "$_builddir"
 	INSTRUMENT="--coverage -fsanitize=address -fsanitize=undefined -fsanitize=cfi -flto -fvisibility=hidden"
-	../$pkgname-$_pkgver/configure --prefix=/usr CC="clang-17" CFLAGS="$INSTRUMENT"
+	../$pkgname-$_pkgver/configure --prefix=/usr/share/srvx CC="clang" CFLAGS="$INSTRUMENT"
 	make
 }
 
@@ -37,5 +37,7 @@ package() {
 	cd "$_builddir"
 	mkdir -p "$pkgdir"
 	make install DESTDIR="$pkgdir"
+	chmod go+x "$pkgdir/usr/share/srvx/srvx"
+	chmod a+w "$pkgdir/usr/share/srvx"
 	return 0
 }

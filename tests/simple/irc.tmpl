@@ -3,13 +3,14 @@ This file contains Go text/template content for an orchestrated test.
 
 The top-level template is a script for the testnet boss, as described
 at README.md from github.com/entrope/testnet.
-Other named templates are used to configure testnet entities.
+Other named templates are used to configure testnet containers.
 Any template named "foo:/bar" will be used to populate a file named
-"/bar" in the container for the entity named "foo".
+"/bar" in the container for the container named "foo".
 */ -}}
 
 SUFFIX example.org
 IRCD irc-1...
+SERVICE srvx...
 CLIENT user1 irc-1...
 :user1 USER user1 12 _ :Some scripted user
 :user1 NICK user1
@@ -23,7 +24,7 @@ Admin {
   Location = "An IRC Testnet";
   Location = "Internetworken";
   Contact = "IRC Admins <irc@example.org>";
-}
+};
 
 Class {
   name = "Server";
@@ -75,11 +76,21 @@ Uworld {
   oper = "srvx.example.org";
   oper = "uworld.example.org";
   name = "channels.example.org";
+
+  oper = "uworld.eu.undernet.org";
+  oper = "uworld2.undernet.org";
+  oper = "uworld.undernet.org";
+  name = "channels.undernet.org";
+  name = "channels2.undernet.org";
+  name = "channels3.undernet.org";
+  name = "channels4.undernet.org";
+  name = "channels5.undernet.org";
+  name = "channels6.undernet.org";
 };
 
 Jupe {
   nick = "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,{,|,},~,-,_,`";
-  nick = "EuWorld,UWorld,UWorld2";
+  nick = "EuWorld,UWorld,UWorld2,OpServ";
   nick = "login,undernet,protocol,pass,newpass,org";
   nick = "StatServ,NoteServ";
   nick = "ChanSvr,ChanSaver,ChanServ";
@@ -93,6 +104,7 @@ Operator {
   password = "$PLAIN$4wp3r4t0r";
   class = "Opers";
   local = no;
+  host = "*";
 };
 
 Port { port = 4400; server = yes; };
@@ -100,7 +112,14 @@ Port { port = 6667; server = no; };
 
 IPCheck { except "::1"; };
 
+IAuth {
+  program = "/usr/libexec/iauthd-c";
+};
+
 Features {
+  "LOG" = "SYSTEM" "FILE" "/home/coder-com/ircd.log";
+  "LOG" = "DEBUG" "FILE" "/home/coder-com/debug.log";
+  "PPATH" = "/home/coder-com/ircd.pid";
 };
 {{- end}}
 
@@ -113,7 +132,113 @@ General {
   name = "{{ .Me }}";
   description = "Testnet Server 1";
   numeric = 1;
-}
+};
 
 {{template "ircd-common-conf" .}}
+
+Connect {
+	name = "srvx.example.org";
+	host = "srvx.example.org";
+	password = "{{ password "1" }}";
+	class = "Server";
+	maxhops = 2;
+	autoconnect = no;
+};
+{{- end}}
+
+{{define "irc-1...:/etc/iauthd-c.conf" -}}
+core {
+  modules ( iauth_xquery )
+}
+
+iauth {
+  timeout 30
+}
+
+iauth_xquery {
+  srvx.example.org combined
+}
+{{- end}}
+
+{{define "srvx...:/usr/share/srvx/srvx.conf" -}}
+"uplinks" {
+	"irc-1" {
+		"address" "{{ index .IP "irc-1.example.org" }}";
+		"port" "4400";
+		"password" "{{ password "1" }}";
+		"their_password" "{{ password "1" }}";
+		"enabled" "1";
+		"max_tries" "3";
+	};
+};
+"services" {
+	"nickserv" {
+		"nick" "NickServ";
+	};
+	"opserv" {
+		"nick" "OpServ";
+	};
+	"chanserv" {
+		"nick" "ChanServ";
+	};
+	"global" {
+		"nick" "Global";
+	};
+};
+"modules" {
+	"helpserv" {
+		"description" "Help Queue Manager";
+	};
+	"sockcheck" {
+		"max_sockets" "64";
+		"max_read" "1024";
+		"gline_duration" "1h";
+		"max_cache_age" "60";
+	};
+	"memoserv" {
+		"bot" "NickServ";
+		"message_expiry" "30d";
+	};
+};
+"server" {
+	"hostname" "srvx.example.org";
+	"description" "Network Services";
+	"network" "TestNET";
+	"hidden_host" "testnet.example";
+	"numeric" "10";
+	"max_users" "4096";
+	"force_n2k" "1";
+	"ping_freq" "60";
+	"ping_timeout" "90";
+	"max_cycles" "30";
+	"admin" ("Test Network", "Gotham City, GO", "Mr Commissioner <james.gordon@testnet.example>");
+	"his_servername" "*.testnet.example";
+	"his_servercomment" "Some Test Network";
+};
+"dbs" {
+	"ChanServ" { "mondo_section" "ChanServ"; };
+	"gline" { "mondo_section" "gline"; };
+	"Global" { "mondo_section" "Global"; };
+	"HelpServ" { "mondo_section" "HelpServ"; };
+	"modcmd" { "mondo_section" "modcmd"; };
+	"NickServ" { "mondo_section" "NickServ"; };
+	"OpServ" { "mondo_section" "OpServ"; };
+	"sendmail" { "mondo_section" "sendmail"; };
+
+	// These are the options if you want a database to be in its own file.
+	"mondo" {
+		// Where to put it?
+		"filename" "srvx.db";
+		// How often should it be saved?
+		// (You can disable automatic saves by setting this to 0.)
+		"frequency" "30m";
+	};
+};
+"logs" {
+	"srvx" {
+		"max_age" "10m";
+		"max_count" "1024";
+	};
+	"*.*" ("std:out");
+};
 {{- end}}

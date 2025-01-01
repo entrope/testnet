@@ -39,6 +39,10 @@ type Extends struct {
 
 // IPAM defines IP address management settings for a network.
 type IPAM struct {
+	// Driver names the network driver to use.
+	Driver string
+
+	// Config is one set of IP address management settings.
 	Config []IPAMConfig
 }
 
@@ -68,7 +72,7 @@ type Network struct {
 // Service describes a container instance within the application.
 type Service struct {
 	// Configs lists the configurations used by the service.
-	Configs []ServiceConfig
+	Configs []ServiceConfig `yaml:",omitempty"`
 
 	// ContainerName indicates what container to use for the service.
 	ContainerName string `yaml:"container_name,omitempty"`
@@ -76,17 +80,17 @@ type Service struct {
 	// Extends is used to inherit common values so they are not repeated.
 	Extends Extends `yaml:",omitempty"`
 
+	// ExtraHosts is a map of additional hostnames to list in /etc/hosts.
+	ExtraHosts map[string]string `yaml:"extra_hosts,omitempty"`
+
 	// Image names the image used for this service.
 	Image string
 
-	// IPv4Address names the IPv4 address to use.
-	IPv4Address netip.Addr `yaml:"ipv4_address,omitempty"`
-
-	// IPv6Address names the IPv6 address to use.
-	IPv6Address netip.Addr `yaml:"ipv6_address,omitempty"`
+	// Build gives the path to the context used to build the image.
+	Build string
 
 	// Networks names the network(s) that this service uses.
-	Networks []string
+	Networks map[string]*ServiceNetwork
 
 	// PullPolicy is how/when Compose retrieves the image.
 	PullPolicy string `yaml:"pull_policy,omitempty"`
@@ -102,4 +106,17 @@ type ServiceConfig struct {
 
 	// Target is the path to mount the config within the container.
 	Target string
+}
+
+// ServiceNetwork configures the settings for a service on some network.
+type ServiceNetwork struct {
+	// IPv4Address names the IPv4 address to use.
+	IPv4Address string `yaml:"ipv4_address,omitempty"`
+
+	// IPv6Address names the IPv6 address to use.
+	IPv6Address string `yaml:"ipv6_address,omitempty"`
+
+	// LinkLocalIPs lists additional IP addresses assigned to this
+	// network interface.
+	LinkLocalIPs []string `yaml:"link_local_ips,omitempty"`
 }

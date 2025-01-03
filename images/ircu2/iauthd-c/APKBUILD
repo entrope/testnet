@@ -9,7 +9,7 @@ arch="all"
 license="MIT"
 makedepends="$depends_dev libevent-dev clang19 compiler-rt"
 options="!strip"
-source="$pkgname-$pkgver.tar.gz"
+source="$pkgname.tar.gz"
 
 _builddir="$srcdir"/+build
 
@@ -19,8 +19,9 @@ build() {
 	cd "$_builddir"
 	# -fsanitize=cfi causes loading the runtime modules to fail
 	INSTRUMENT="--coverage -fsanitize=address -fsanitize=undefined"
-	../$pkgname-$pkgver/configure --prefix=/usr --localstatedir=/var --sysconfdir=/etc CC="clang" CFLAGS="$INSTRUMENT"
+	../$pkgname/configure --prefix=/usr --localstatedir=/var --sysconfdir=/etc CC="clang" CFLAGS="$INSTRUMENT"
 	make
+	if test x`find . -name \*.gcno -print -quit` != x ; then tar cjf $HOME/iauthd-c-gcno.tar.bz2 . ; fi
 }
 
 check() {

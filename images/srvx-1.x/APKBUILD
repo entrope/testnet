@@ -15,7 +15,7 @@ options="!strip"
 install="$pkgname.pre-install"
 pkggroups="coder-com"
 pkgusers="coder-com"
-source="$pkgname-$_pkgver.tar.gz"
+source="$pkgname-1.x.tar.gz"
 
 _builddir="$srcdir"/+build
 
@@ -24,8 +24,9 @@ build() {
 	mkdir -p "$_builddir"
 	cd "$_builddir"
 	INSTRUMENT="--coverage -fsanitize=address -fsanitize=undefined -fsanitize=cfi -flto -fvisibility=hidden"
-	../$pkgname-$_pkgver/configure --prefix=/usr/share/srvx CC="clang" CFLAGS="$INSTRUMENT"
+	../$pkgname-1.x/configure --prefix=/usr/share/srvx CC="clang" CFLAGS="$INSTRUMENT"
 	make
+	if test x`find . -name \*.gcno -print -quit` != x ; then tar cjf $HOME/srvx-1.x-gcno.tar.bz2 . ; fi
 }
 
 check() {

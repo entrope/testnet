@@ -41,6 +41,7 @@ var lcovTool = flag.String("lcov", "lcov",
 	"Coverage tool to execute")
 var seedFlag = flag.String("seed", "",
 	"Random seed to use (base64 encoded)")
+var failed bool
 var scriptName string
 var seed []byte
 
@@ -76,9 +77,37 @@ func ircIsSpace(ch byte) bool {
 	return isSpaceAry[ch]
 }
 
+// createBoss creates the "boss" service.
+func createBoss() {
+	// Skip the first address so that Podman can use it for DNS etc.
+	nextAddr = nextAddr.Next()
+
+	// Create the service.
+	if err := makeService("boss", "boss"); err != nil {
+		log.Fatalf("failed to create boss service: %v", err)
+	}
+
+	// Allow the boss to implement an ident server and know extra IPs.
+	boss := compose.Services["boss"]
+	// `podman build` is unstable, so we only use the Build directive
+	// for images without profiling support :(
+	boss.Build = "../../images/boss"
+	boss.Configs = []ServiceConfig{{
+		Source: "irc.script",
+		Target: "/etc/irc.script",
+	}}
+	boss.Sysctls = map[string]string{
+		"net.ipv4.ip_unprivileged_port_start": "113",
+	}
+}
+
 // makeService adds a service named `name` with type `image` to the
 // Compose application.
 func makeService(name string, image string) error {
+	if compose.Services["boss"] == nil && name != "boss" {
+		createBoss()
+	}
+
 	svcNetwork := ServiceNetwork{}
 	if nextAddr.Is4() {
 		svcNetwork.IPv4Address = nextAddr.String()
@@ -86,21 +115,13 @@ func makeService(name string, image string) error {
 		svcNetwork.IPv6Address = nextAddr.String()
 	}
 	svc := &Service{
-		Image: "localhost/testnet/" + image,
-		Build: "../../images/" + image,
+		Image: "localhost/coder-com/" + image,
 		Networks: map[string]*ServiceNetwork{
 			"inner": &svcNetwork,
 		},
 		PullPolicy: "never",
 	}
 	nextAddr = nextAddr.Next()
-	// Allow the boss to implement an ident server and know extra IPs.
-	if name == "boss" {
-		svc.Sysctls = map[string]string{
-			"net.ipv4.ip_unprivileged_port_start": "113",
-		}
-		svc.ExtraHosts = make(map[string]string)
-	}
 	compose.Services[name] = svc
 	containers[name] = name
 	return nil
@@ -118,7 +139,7 @@ func replaceSuffix(name string) string {
 // cmdClient handles the CLIENT script command, to create a new client.
 func cmdClient(words []string) error {
 	if len(words) < 2 {
-		return errors.New("Expected CLIENT <name>[@<client>] <server> [<username>]")
+		return errors.New("Expected CLIENT <name>[@<client>] <server>[/tls] [<username>]")
 	}
 
 	// Parse out the command line arguments.
@@ -130,7 +151,7 @@ func cmdClient(words []string) error {
 	server := words[1]
 	// Strip off /tls and :<port> from server name, if present.
 	server, _ = strings.CutSuffix(server, "/tls")
-	if idx := strings.IndexByte(server, ':'); idx > 0 {
+	if idx := strings.LastIndexByte(server, ':'); idx > 0 {
 		server = server[:idx]
 	}
 	server = replaceSuffix(server)
@@ -154,20 +175,21 @@ func cmdClient(words []string) error {
 		return errors.New("server name must contain a dot")
 	}
 	if _, ok := containers[server]; !ok {
-		return errors.New("No existing server is named " + server)
+		return errors.New("no existing server is named " + server)
 	}
 
-	// Clients run on the boss service.  If this client needs a new IP
-	// address, assign one to the boss container.
+	// Clients run on the boss service.
 	containers[name] = "boss"
+
+	// If this client needs a dedicated IP address, assign one.
 	if runsOn == "" {
 		// Allocate an IP address.
 		extraIP := nextAddr.String()
 		nextAddr = nextAddr.Next()
 
-		// Assign it to the boss service and ready it for /etc/hosts.
-		bossSvc := compose.Services["boss"]
-		bossSvc.ExtraHosts[name] = extraIP
+		// Assign it to the container and ready it for /etc/hosts.
+		bossSvc := compose.Services[containers[name]]
+		bossSvc.ExtraHosts = append(bossSvc.ExtraHosts, name+":"+extraIP)
 		nw := bossSvc.Networks["inner"]
 		nw.LinkLocalIPs = append(nw.LinkLocalIPs, extraIP)
 		bossSvc.Networks["inner"] = nw
@@ -179,16 +201,16 @@ func cmdClient(words []string) error {
 func cmdServer(words []string) error {
 	// Parse the command line arguments.
 	if len(words) != 2 {
-		return errors.New("Expected SERVER <name> <image>")
+		return errors.New("expected SERVER <name> <image>")
 	}
 	name := replaceSuffix(words[0])
 	image := words[1]
 
 	if !strings.ContainsAny(name, ".") {
-		return errors.New("Server names must contain a dot")
+		return errors.New("server names must contain a dot")
 	}
 	if _, ok := containers[name]; ok {
-		return errors.New("Already have something named " + name)
+		return errors.New("already have something named " + name)
 	}
 
 	return makeService(name, image)
@@ -264,8 +286,9 @@ func populateHelpers() {
 
 // ConfigObject is passed to config-file templates.
 type ConfigObject struct {
-	Me string
-	IP map[string]string
+	Me       string
+	IP       map[string]string
+	ClientIP map[string]string
 }
 
 // writeConfig writes the config file for `name`.
@@ -289,6 +312,14 @@ func writeConfig(tmpl *template.Template, ips map[string]string) {
 		return
 	}
 
+	// Build a subset of the IP mappings for clients.
+	clientIP := make(map[string]string)
+	for k, v := range ips {
+		if !strings.ContainsRune(k, '.') {
+			clientIP[k] = v
+		}
+	}
+
 	// Create the file and execute the template.
 	f, err := os.Create(fullPath)
 	if err != nil {
@@ -296,8 +327,9 @@ func writeConfig(tmpl *template.Template, ips map[string]string) {
 		return
 	}
 	if err = tmpl.Execute(f, &ConfigObject{
-		Me: host,
-		IP: ips,
+		Me:       host,
+		IP:       ips,
+		ClientIP: clientIP,
 	}); err != nil {
 		log.Fatal(err)
 	}
@@ -349,15 +381,15 @@ func setup() {
 	})
 	tmpl, err = tmpl.ParseFiles("irc.tmpl")
 	if err != nil {
-		log.Fatalf("Failed to parse irc.tmpl as a template file: %v", err)
+		log.Fatalf("failed to parse irc.tmpl as a template file: %v", err)
 	}
 	sb := &strings.Builder{}
 	if err = tmpl.Execute(sb, nil); err != nil {
-		log.Fatalf("Failed to evaluate %s: %v", scriptName, err)
+		log.Fatalf("failed to evaluate %s: %v", scriptName, err)
 	}
 	scriptText := sb.String()
 	if err = os.WriteFile("irc.script", []byte(scriptText), fileMode); err != nil {
-		log.Fatalf("Failed to write irc.script: %v", err)
+		log.Fatalf("failed to write irc.script: %v", err)
 	}
 	sb = nil
 
@@ -375,17 +407,9 @@ func setup() {
 		},
 	}
 
-	// Create the 'boss' service.
-	if err := makeService("boss", "boss"); err != nil {
-		log.Fatalf("Failed to create boss service: %v", err)
-	}
+	// Create a config for the master script.
 	compose.Configs["irc.script"] = &ConfigOrSecret{
 		File: "irc.script",
-	}
-	compose.Services["boss"].Configs = []ServiceConfig{{
-		Source: "irc.script",
-		Target: "/etc/irc.script",
-	},
 	}
 
 	// Split the script text into lines and process each.
@@ -414,11 +438,11 @@ func setup() {
 	// Write out the Compose file.
 	var composeText []byte
 	if composeText, err = yaml.Marshal(&compose); err != nil {
-		log.Fatalf("Failed to format compose file: %v", err)
+		log.Fatalf("failed to format compose file: %v", err)
 	}
 	err = os.WriteFile("compose.yaml", composeText, fileMode)
 	if err != nil {
-		log.Fatalf("Failed to write compose file: %v", err)
+		log.Fatalf("failed to write compose file: %v", err)
 	}
 }
 
@@ -474,6 +498,106 @@ func execToolMap(args ...string) iter.Seq2[string, string] {
 }
 
 type stringSet = map[string]struct{}
+
+// If `hdr` is for a GCNO file, extract it from `tr`.
+func extractGcnoFile(hdr *tar.Header, tr *tar.Reader) {
+	// Ignore files that are not in the builder's home directory.
+	const prefix = "home/coder-com/"
+	if !strings.HasPrefix(hdr.Name, prefix) {
+		return
+	}
+
+	// Ignore files that do not end with the right suffix.
+	idx := strings.LastIndexByte(hdr.Name, '/')
+	fileName := hdr.Name[idx:]
+	pkg, found := strings.CutSuffix(fileName, "-gcno.tar.bz2")
+	if !found {
+		return
+	}
+
+	// Copy the file to the host directory.
+	gcnoFile := filepath.Join("..", "..", "coverage", pkg, fileName)
+	out, err := os.Create(gcnoFile)
+	if err != nil {
+		log.Fatalf("error creating %s: %v", gcnoFile, err)
+	}
+	if _, err := io.Copy(out, tr); err != nil {
+		log.Fatalf("error copying %s: %v", gcnoFile, err)
+	}
+	if err = out.Close(); err != nil {
+		log.Println(err)
+	}
+}
+
+// Extracts GCNO files from the specified container's `build` stage.
+func extractGcno(container string) {
+	// What's the name of the image?
+	cmd := exec.Command(*toolName, "inspect", container, "--format", "{{.ImageName}}")
+	imageName, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("unable to retrieve ImageName for container %s: %v", container, err)
+	}
+	label, _, found := strings.Cut(string(imageName), ":")
+	if !found {
+		log.Fatalf("ImageName for %s had no colon: %s", container, imageName)
+	}
+	idx := strings.LastIndexByte(label, '/')
+	name := label[idx+1:]
+
+	// Try to create a container from the tagged build stage.
+	// If that fails, build and tag it.
+	tag := label + ":build"
+	cmd = exec.Command(*toolName, "create", "--pull", "never", tag)
+	containerID, err := cmd.CombinedOutput()
+	if err != nil {
+		contextPath := filepath.Join("..", "..", "images", name)
+		buildCmd := exec.Command(*toolName, "build",
+			"--target", "build",
+			"-t", tag,
+			contextPath)
+		if _, err := buildCmd.CombinedOutput(); err != nil {
+			log.Fatalf("failed to build %s: %v", tag, err)
+		}
+
+		cmd = exec.Command(*toolName, "create", "--pull", "never", tag)
+		if containerID, err = cmd.CombinedOutput(); err != nil {
+			log.Fatalf("failed to create image for %s: %v", tag, err)
+		}
+	}
+	id := strings.TrimSpace(string(containerID))
+
+	// Tidy up the container before we leave.
+	defer func() {
+		cmd := exec.Command(*toolName, "rm", id)
+		if msg, err := cmd.CombinedOutput(); err != nil {
+			log.Fatalf("failed to remove container %s: %v:\n%s\n", id, err, string(msg))
+		}
+	}()
+
+	// Trawl the container's filesystem to find GCNO files.
+	cmd = exec.Command(*toolName, "export", id)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatalf("getting pipe for podman export %s: %v", id, err)
+	}
+	if err = cmd.Start(); err != nil {
+		log.Fatalf("starting podman export %s: %v", id, err)
+	}
+
+	// Read the tarfile from the tool's stdout.
+	tr := tar.NewReader(stdout)
+	for {
+		hdr, err := tr.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			log.Fatalf("error reading from %s: %v", id, err)
+		}
+
+		extractGcnoFile(hdr, tr)
+	}
+}
 
 // If `hdr` is a GCDA file, copies it to the profile working directory.
 func collectHeader(hdr *tar.Header, tr *tar.Reader, done stringSet) stringSet {
@@ -556,6 +680,13 @@ func collectOutput(id string) {
 	// For each GCDA directory we processed, save its data and remove
 	// the working GCDA directory.
 	for pkg := range done {
+		// Do we need to extract GCNO files for this image?
+		gcnoDir := filepath.Join("..", "..", "coverage", pkg, "gcno")
+		if _, err := os.Stat(gcnoDir); errors.Is(err, os.ErrNotExist) {
+			extractGcno(id)
+		}
+
+		// Call the script to generate a coverage report.
 		cmd := exec.Command("sh", "-e", "coverage.sh")
 		cmd.Dir = filepath.Join("..", "..", "coverage", pkg)
 		if txt, err := cmd.CombinedOutput(); err != nil {
@@ -587,6 +718,7 @@ func collect() {
 	}
 }
 
+//revive:disable:cyclomatic
 func main() {
 	// Parse the command line.
 	collectFiles := make([]string, 0, 4)
@@ -627,16 +759,16 @@ func main() {
 	}
 
 	// Generate and execute the test scripts.
-	if !*noGenerate {
-		log.Print("Creating Compose application")
+	if !*noGenerate && !failed {
+		log.Print("creating Compose application")
 		setup()
 	}
-	if !*noExecute {
-		log.Print("Launching Compose application")
+	if !*noExecute && !failed {
+		log.Print("launching Compose application")
 		execute()
 	}
-	if !*noCollect {
-		log.Print("Collecting coverage data")
+	if !*noCollect && !failed {
+		log.Print("collecting coverage data")
 		collect()
 	}
 }

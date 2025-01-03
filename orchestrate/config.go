@@ -80,14 +80,17 @@ type Service struct {
 	// Extends is used to inherit common values so they are not repeated.
 	Extends Extends `yaml:",omitempty"`
 
-	// ExtraHosts is a map of additional hostnames to list in /etc/hosts.
-	ExtraHosts map[string]string `yaml:"extra_hosts,omitempty"`
+	// ExtraHosts is a list of additional hostname/IP mappings to put
+	// into /etc/hosts.
+	// podman-compose (v1.2.0) requires this to be a string list rather
+	// than a map.
+	ExtraHosts []string `yaml:"extra_hosts,omitempty"`
 
 	// Image names the image used for this service.
 	Image string
 
 	// Build gives the path to the context used to build the image.
-	Build string
+	Build string `yaml:",omitempty"`
 
 	// Networks names the network(s) that this service uses.
 	Networks map[string]*ServiceNetwork

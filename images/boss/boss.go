@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"os/signal"
@@ -27,7 +28,21 @@ func clientUnknown(name string) {
 // doSendText sends a line from a client to its server.
 // Syntax: `SEND [!]<name> :<text>` or `:[!]<name> <text>`
 // The optional '!' prefix suppresses the usual rate limiting logic.
-func doSendText(name string, text string) {
+// Returns true if the send should be retried later.
+func doSendText(name string, text string) bool {
+	// Do we know the client?
+	client, ok := clients[name]
+	if !ok {
+		clientUnknown(name)
+		return false
+	}
+
+	// Is this client waiting on text?
+	if len(client.Expect) > 0 {
+		waitClients = append(waitClients, client)
+		return true
+	}
+
 	// Should we use the default rate-limiting?
 	rateLimit := true
 	if name[0] == '!' {
@@ -35,16 +50,13 @@ func doSendText(name string, text string) {
 		name = name[1:]
 	}
 
-	// Do we know the client?
-	if client, ok := clients[name]; ok {
-		text = client.Expand(text)
-		if rateLimit {
-			client.RateLimit(text)
-		}
-		client.Send(text)
-	} else {
-		clientUnknown(name)
+	// Expand the text to send, apply rate limiting, then send..
+	text = client.Expand(text)
+	if rateLimit {
+		client.RateLimit(text)
 	}
+	client.Send(text)
+	return false
 }
 
 // addExpect adds an expected line for the specified client.
@@ -57,23 +69,23 @@ func addExpect(name, pattern string) {
 	exp := Expectation{Deadline: time.Now()}
 
 	// Is it fatal?
-	if name[len(name)-1] == '!' {
+	if name[0] == '!' {
 		exp.Fatal = true
-		name = name[:len(name)-1]
+		name = name[1:]
 	}
 
 	// Is there a timeout?
+	timeout := "10s"
 	if idx := strings.LastIndexByte(name, '@'); idx > 0 {
-		sec, err := strconv.ParseFloat(name[idx+1:], 64)
-		if err != nil {
-			fmt.Printf("ERROR COMMAND EXPECT :invalid duration %s\n", name[idx+1:])
-			return
-		}
-		exp.Deadline.Add(time.Duration(math.Round(1e9 * sec)))
+		timeout = name[idx+1:]
 		name = name[:idx]
-	} else {
-		exp.Deadline.Add(time.Duration(10) * time.Second)
 	}
+	sec, err := strconv.ParseFloat(timeout, 64)
+	if err != nil {
+		fmt.Printf("ERROR COMMAND EXPECT :invalid duration %s\n", timeout)
+		return
+	}
+	exp.Deadline.Add(time.Duration(math.Round(1e9 * sec)))
 
 	// Look up the client so we can expand "pattern".
 	if client, ok := clients[name]; ok {
@@ -91,15 +103,28 @@ func addExpect(name, pattern string) {
 }
 
 // doWait records that we want to wait for the named clients.
-// Syntax: `WAIT <name ...>`
-func doWait(names []string) {
-	for _, name := range names {
-		if client, ok := clients[name]; ok {
-			waitClients = append(waitClients, client)
-		} else {
-			clientUnknown(name)
+// Syntax: `WAIT [<name ...>]`
+// Returns true if the WAIT should be retried later.
+func doWait(names []string) bool {
+	if len(names) == 0 {
+		// Default to waiting for all clients with expectations.
+		for _, client := range clients {
+			if len(client.Expect) > 0 {
+				waitClients = append(waitClients, client)
+			}
+		}
+	} else {
+		// Wait for the named clients.
+		for _, name := range names {
+			if client, ok := clients[name]; ok {
+				waitClients = append(waitClients, client)
+			} else {
+				clientUnknown(name)
+			}
 		}
 	}
+
+	return len(waitClients) > 0
 }
 
 // checkWaitClients processes expectations for some set of clients.
@@ -125,51 +150,49 @@ func checkWaitClients() bool {
 func createClient(argv []string, textChan chan<- TextLine) {
 	// Parse argv[].
 	name, server, username := argv[1], argv[2], ""
-	if argc := len(argv); argc > 2 {
-		username = argv[argc-1]
+	if argc := len(argv); argc > 3 {
+		username = argv[3]
 	}
+	fmt.Printf("CLIENT %s %s %s\n", name, server, username)
 
 	client := NewClient(name, server, username, textChan)
 	clients[client.Nickname] = client
 }
 
-func executeLine(text string, textChan chan<- TextLine) {
-	fmt.Println(text)
+// executeLine executes one line of script.
+// It returns false on success, and true if the line should be retried.
+func executeLine(text string, textChan chan<- TextLine) bool {
 	parts := ScriptSplitLine(text)
 	if parts == nil {
-		return
+		return false
 	}
 
 	switch parts[0] {
+	case "CIDR":
+		// do nothing; this is handled by the orchestrator
 	case "CLIENT":
 		createClient(parts, textChan)
 	case "EXPECT":
 		addExpect(parts[1], parts[2])
 	case "SERVER":
-		// do nothing; these are handled by the test driver
+		// do nothing; this is handled by the orchestrator
 	case "SEND":
-		doSendText(parts[1], parts[2])
+		return doSendText(parts[1], parts[2])
 	case "SUFFIX":
 		Suffix = parts[1]
 	case "WAIT":
-		doWait(parts[1:])
+		return doWait(parts[1:])
 	default:
 		fmt.Printf("ERROR COMMAND %s :%s\n", parts[0], text)
 	}
+
+	return false
 }
 
-// doWork processes I/O and returns true if the script should continue.
-func doWork(signalChannel <-chan os.Signal, textChan chan TextLine, f *os.File) (res bool) {
-	res = true
-	s := bufio.NewScanner(f)
-	s.Buffer(make([]byte, 32768), 512)
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("ERROR INPUT :%v\n", r)
-			res = false
-		}
-	}()
+var retryLine string
 
+// doWork processes I/O and returns true if the script should continue.
+func doWork(signalChannel <-chan os.Signal, textChan chan TextLine, s *bufio.Scanner) bool {
 	select {
 	case sig := <-signalChannel:
 		if sig == syscall.SIGTERM || sig == syscall.SIGINT {
@@ -180,6 +203,7 @@ func doWork(signalChannel <-chan os.Signal, textChan chan TextLine, f *os.File) 
 
 	case text := <-textChan:
 		text.Handle()
+		return true
 
 	default:
 		// Are we waiting for any clients?
@@ -188,21 +212,30 @@ func doWork(signalChannel <-chan os.Signal, textChan chan TextLine, f *os.File) 
 			return true
 		}
 
-		// Read and execute a line of input, if we can.
-		if s.Scan() {
-			executeLine(s.Text(), textChan)
-			return true
+		// Do we need to read a new line from the file?
+		if retryLine == "" {
+			if !s.Scan() {
+				if err := s.Err(); err != nil {
+					log.Printf("error scanning input: %v", err)
+				} else {
+					log.Printf("end of script (%v)", err)
+				}
+				return false
+			}
+			retryLine = s.Text()
+			log.Printf("%s\n", retryLine)
 		}
 
-		// Otherwise we encountered EOF or an error.
-		if err := s.Err(); err != nil {
-			fmt.Printf("ERROR INPUT :%v\n", err)
+		// Execute it.
+		if !executeLine(retryLine, textChan) {
+			retryLine = ""
 		}
-		fmt.Printf("script eof (?)\n")
-		return false
+
+		return true
 	}
 
-	return res
+	log.Fatal("ERROR SELECT :fell off end of doWork")
+	return false
 }
 
 func main() {
@@ -230,7 +263,18 @@ func main() {
 	// Run the main event loop.
 	go ident.Serve()
 	textChan := make(chan TextLine, 64)
-	for doWork(signalChannel, textChan, input) {
+
+	// Create a scanner, which will panic if the input line is too long.
+	s := bufio.NewScanner(input)
+	s.Buffer(make([]byte, 32768), 512)
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("ERROR INPUT :%v\n", r)
+		}
+	}()
+
+	// Work until we cannot.
+	for doWork(signalChannel, textChan, s) {
 	}
 
 	// Close everything.

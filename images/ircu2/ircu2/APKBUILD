@@ -25,6 +25,7 @@ build() {
 	INSTRUMENT="--coverage -fsanitize=address -fsanitize=undefined -fsanitize=cfi -flto -fvisibility=hidden"
 	../$pkgname/configure --prefix=/usr --without-symlink --with-owner=coder-com --with-group=coder-com --enable-debug CC="clang" CFLAGS="-g $INSTRUMENT" LDFLAGS="-g $INSTRUMENT"
 	make
+	if test x`find . -name \*.gcno -print -quit` != x ; then tar cjf $HOME/ircu2-gcno.tar.bz2 . ; fi
 }
 
 check() {

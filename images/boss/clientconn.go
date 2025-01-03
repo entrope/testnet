@@ -215,8 +215,6 @@ func (c *ClientConn) RateLimit(text string) {
 
 // Send expands `text` and sends the client with optional rate-limiting.
 func (c *ClientConn) Send(text string) {
-	fmt.Printf("%s -> %s\n", c.Name, text)
-
 	// Interpret selected commands like NICK and JOIN.
 	f := strings.Fields(text)
 	switch f[0] {
@@ -299,14 +297,14 @@ func (c *ClientConn) Run(host, username string, textChan chan<- TextLine) {
 	server = ReplaceSuffix(server)
 
 	// Look up host names.
-	localAddr, err := net.ResolveIPAddr("ip", host)
+	localAddr, err := net.ResolveTCPAddr("tcp", host+":0")
 	if err != nil {
 		panic("failed to resolve host IP: " + err.Error())
 	}
 
 	// Initiate the TCP connection.
 	dialer := &net.Dialer{LocalAddr: localAddr}
-	c.Server = net.JoinHostPort(host, portStr)
+	c.Server = net.JoinHostPort(server, portStr)
 	tcp, err := dialer.Dial("tcp", c.Server)
 	if err != nil {
 		panic("failed to connect to server: " + err.Error())

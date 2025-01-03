@@ -1,74 +1,85 @@
+DOCKER = podman
 GIT = git
 GO = go
-DOCKER = podman
-IAUTH_VERSION = 1.0.5
-SRVX_VERSION = 1.4.0-rc3
 
-.PHONY: clean
+.PHONY: all build clean clean-all coverage
 
-all: packages images orchestrate/orchestrate
+TARBALLS = \
+	images/ircu2/iauthd-c/iauthd-c.tar.gz \
+	images/ircu2/ircu2/ircu2.tar.gz \
+	images/srvx-1.x/srvx-1.x.tar.gz
 
-orchestrate/orchestrate: orchestrate/main.go
-	cd orchestrate && $(GO) build
+COVERAGE = \
+	coverage/iauthd-c/html/index.html \
+	coverage/ircu2/html/index.html \
+	coverage/srvx-1.x/html/index.html
 
-images: packages
-	for pkg in boss ircu2 srvx-1.x ; do \
-		if test -z `$(DOCKER) images -q localhost/testnet/$$pkg` ; then \
-			$(DOCKER) build packages -f Dockerfile.$$pkg -t localhost/testnet/$${pkg} ; \
-		fi; \
-	done
+all: orchestrate/orchestrate $(TARBALLS) .deps
+coverage: $(COVERAGE)
 
-packages: Dockerfile.buildimg \
-	Dockerfile.builder \
-	builder/go-testnet/go.mod \
-	builder/iauthd-c/iauthd-c-$(IAUTH_VERSION).tar.gz \
-	builder/ircu2/ircu2.tar.gz \
-	builder/srvx-1.x/srvx-$(SRVX_VERSION).tar.gz
-	rm -fr packages
-	if ! CID=`$(DOCKER) create localhost/coder-com/builder` ; then \
-		$(DOCKER) build builder -f Dockerfile.builder -t localhost/coder-com/builder && \
-		CID=`$(DOCKER) create localhost/coder-com/builder` ; \
-	fi && \
-	$(DOCKER) cp $$CID:/home/coder-com/packages . && \
-	$(DOCKER) rm $$CID > /dev/null
+# generic targets
 
-images/ircu2/iauthd-c/iauthd-c-$(IAUTH_VERSION).tar.gz: +iauthd-c/Makefile
-	$(MAKE) -C +iauthd-c dist
-	rm -f $@ && ln +iauthd-c/iauthd-c-$(IAUTH_VERSION).tar.gz $@
+iauthd-c/configure.ac ircu2/configure srvx-1.x/configure.ac: .gitmodules
+	$(GIT) submodule update --init
 
-images/ircu2/ircu2/ircu2.tar.gz: ircu2/configure
-	tar czf $@ ircu2
+clean:
+	rm -f orchestrate/orchestrate coverage/*/lcov.dat coverage/*/*-gcno.tar.bz2 tests/*/compose.yaml tests/*/irc.script
+	rm -fr coverage/*/gcda coverage/*/gcno coverage/*/html
+	for dir in tests/*/* ; do if test -d $$dir ; then rm -r $$dir ; fi ; done
 
-images/srvx-1.x/srvx-$(SRVX_VERSION).tar.gz: +srvx-1.x/Makefile
-	$(MAKE) -C +srvx-1.x dist
-	rm -f $@ && ln +srvx-1.x/srvx-$(SRVX_VERSION).tar.gz $@
+clean-all: clean
+	rm -f $(TARBALLS)
+
+build: $(TARBALLS)
+	$(DOCKER) build --target build -t localhost/coder-com/ircu2:build images/ircu2
+	$(DOCKER) build -t localhost/coder-com/ircu2:latest images/ircu2
+	$(DOCKER) build --target build -t localhost/coder-com/srvx-1.x:build images/srvx-1.x
+	$(DOCKER) build -t localhost/coder-com/srvx-1.x:latest images/srvx-1.x
+
+# orchestrate
+
+orchestrate/orchestrate: orchestrate/orchestrate.go
+	$(GO) build -C orchestrate
+
+# iauthd-c
+
+iauthd-c/configure: iauthd-c/configure.ac
+	autoreconf -Wall -i iauthd-c
 
 +iauthd-c/Makefile: iauthd-c/configure
 	test -d +iauthd-c || mkdir +iauthd-c
 	cd +iauthd-c && ../iauthd-c/configure
 
-+srvx-1.x/Makefile: srvx-1.x/configure
-	test -d +srvx-1.x || mkdir +srvx-1.x
-	cd +srvx-1.x && ../srvx-1.x/configure --enable-maintainer-mode
+images/ircu2/iauthd-c/iauthd-c.tar.gz: +iauthd-c/Makefile
+	$(MAKE) -C +iauthd-c dist distdir=iauthd-c
+	rm -f $@ && ln +iauthd-c/iauthd-c.tar.gz $@
 
-iauthd-c/configure: iauthd-c/configure.ac
-	autoreconf -Wall -i iauthd-c
+coverage/iauthd-c/html/index.html: coverage/iauthd-c/lcov.dat
+	cd coverage/iauthd-c && ./coverage.sh html
+
+# ircu2
+
+images/ircu2/ircu2/ircu2.tar.gz: ircu2/configure
+	tar czf $@ ircu2
+
+coverage/ircu2/html/index.html: coverage/ircu2/lcov.dat
+	cd coverage/ircu2 && ./coverage.sh html
+
+# srvx-1.x
 
 srvx-1.x/configure: srvx-1.x/configure.ac
 	autoreconf -Wall -i srvx-1.x
 
-iauthd-c/configure.ac ircu2/configure srvx-1.x/configure.ac \
-	builder/go-testnet/go.mod:
-	$(GIT) submodule update --init
++srvx-1.x/Makefile: srvx-1.x/configure
+	test -d +srvx-1.x || mkdir +srvx-1.x
+	cd +srvx-1.x && ../srvx-1.x/configure --enable-maintainer-mode
 
-clean-tests:
-	for dir in tests/*/* ; do if test -d $$dir ; then rm -r $$dir ; fi ; done
-	rm -fr coverage/*/gcda coverage/*/gcno coverage/*/lcov.dat \
-	tests/*/compose.yaml tests/*/irc.script
+images/srvx-1.x/srvx-1.x.tar.gz: +srvx-1.x/Makefile
+	$(MAKE) -C +srvx-1.x dist distdir=srvx-1.x
+	rm -f $@ && ln +srvx-1.x/srvx-1.x.tar.gz $@
 
-clean: clean-tests
-	rm -fr packages \
-	orchestrate/orchestrate \
-	builder/iauthd-c/iauthd-c-$(IAUTH_VERSION).tar.gz \
-	builder/ircu2/ircu2.tar.gz \
-	builder/srvx-1.x/srvx-$(SRVX_VERSION).tar.gz
+coverage/srvx-1.x/html/index.html: coverage/srvx-1.x/lcov.dat
+	cd coverage/srvx-1.x && ./coverage.sh html
+
+# tools/checkdeps.go will populate .deps.
+include .deps

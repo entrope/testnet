@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # Make sure the .gcno files are available.
-test -d gcno || ( mkdir gcno && cd gcno && tar xf ../../../packages/iauthd-c-bin.tar.bz2)
+test -d gcno || ( mkdir gcno && cd gcno && tar xf ../iauthd-c-gcno.tar.bz2)
 
 # Collect output data, or generate HTML.
 GCDA=${1-gcda}

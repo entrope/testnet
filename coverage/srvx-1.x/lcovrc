@@ -2,8 +2,7 @@ branch_coverage = 1
 checksum = 1
 exclude = /usr/include/*
 exclude = conftest.c
-ignore_errors = unused
+ignore_errors = unused,inconsistent
 stop_on_error = 0
 substitute = s,gcda/,gcno/,
 substitute = s,coverage/srvx-1\.x/srvx-1[^/]+/,srvx-1.x/,
-

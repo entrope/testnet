@@ -1,4 +1,4 @@
-{{- /*
+{{/*
 This file contains Go text/template content for an orchestrated test.
 
 The top-level template is a script for the testnet boss, as described
@@ -9,15 +9,32 @@ Any template named "foo:/bar" will be used to populate a file named
 */ -}}
 
 SUFFIX example.org
-IRCD irc-1...
-SERVICE srvx...
+SERVER irc-1... ircu2
+SERVER srvx... srvx-1.x
 CLIENT user1 irc-1...
+CLIENT user2@user1 irc-1...
 :user1 USER user1 12 _ :Some scripted user
+:user2 USER user2 12 _ :Another bot
 :user1 NICK user1
+:user2 NICK user2
+:user1 JOIN #coder-com
+:user2 JOIN #coder-com
+WAIT
+:user1 PRIVMSG #coder-com :Hello, world!
+
+{{define "boss:/bin/init.sh" -}}
+#! /bin/sh
+
+{{ range $name, $ip := .ClientIP -}}
+ip addr add $ip dev eth0
+{{ end -}}
+/bin/boss
+exec sleep 900
+{{end -}}
 
 {{define "ircd.motd" -}}
 HELLO WORLD FROM ircd.motd !!!
-{{- end}}
+{{- end -}}
 
 {{define "ircd-common-conf" -}}
 Admin {
@@ -121,11 +138,11 @@ Features {
   "LOG" = "DEBUG" "FILE" "/home/coder-com/debug.log";
   "PPATH" = "/home/coder-com/ircd.pid";
 };
-{{- end}}
+{{- end -}}
 
 {{define "irc-1...:/usr/lib/ircd.motd" -}}
 {{template "ircd.motd" .}}
-{{- end}}
+{{- end -}}
 
 {{define "irc-1...:/usr/lib/ircd.conf" -}}
 General {
@@ -144,7 +161,7 @@ Connect {
 	maxhops = 2;
 	autoconnect = no;
 };
-{{- end}}
+{{- end -}}
 
 {{define "irc-1...:/etc/iauthd-c.conf" -}}
 core {
@@ -158,7 +175,7 @@ iauth {
 iauth_xquery {
   srvx.example.org combined
 }
-{{- end}}
+{{- end -}}
 
 {{define "srvx...:/usr/share/srvx/srvx.conf" -}}
 "uplinks" {
@@ -241,4 +258,4 @@ iauth_xquery {
 	};
 	"*.*" ("std:out");
 };
-{{- end}}
+{{- end -}}

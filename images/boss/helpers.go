@@ -41,7 +41,6 @@ func IrcTrim(line string) string {
 // Following tokens are delimited by spaces, but a token starting with
 // ':' means the rest of the line is a single (line-final) token.
 func appendSplit(parts []string, line string) []string {
-
 	for ii, ll, first := 0, len(line), true; ii < ll; first = false {
 		// Skip leading whitespace.
 		for ; ii < ll && line[ii] == ' '; ii++ {

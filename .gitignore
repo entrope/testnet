@@ -3,6 +3,8 @@
 /coverage/*/gcda/
 /coverage/*/html/
 /coverage/*/lcov.dat
+/coverage/*/*-gcno.tar.bz2
 /images/boss/boss
 /images/**/*.tar.gz
 /+*/
+/.deps

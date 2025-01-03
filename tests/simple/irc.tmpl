@@ -23,13 +23,10 @@ WAIT
 :user1 PRIVMSG #coder-com :Hello, world!
 
 {{define "boss:/bin/init.sh" -}}
-#! /bin/sh
+#! /bin/sh -e
 
-{{ range $name, $ip := .ClientIP -}}
-ip addr add $ip dev eth0
-{{ end -}}
-/bin/boss
-exec sleep 900
+sleep 900
+exec /bin/boss
 {{end -}}
 
 {{define "ircd.motd" -}}

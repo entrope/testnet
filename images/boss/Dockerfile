@@ -10,5 +10,5 @@ COPY --from=builder /etc/passwd /etc/group /etc/
 COPY --from=builder /home/coder-com/go/bin/boss /bin/boss
 USER root
 STOPSIGNAL SIGTERM
-ENTRYPOINT ["/bin/sh", "/bin/init.sh"]
+ENTRYPOINT ["/bin/sh", "-e", "/bin/init.sh"]
 CMD []
